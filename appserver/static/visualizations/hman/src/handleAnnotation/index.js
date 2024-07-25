@@ -22,7 +22,6 @@ const _handleAnnotation = function (data, echartProps, option, dedicatedEchart) 
   dedicatedEchart["opco"] = echartProps.opco;
 
   dedicatedEchart['instanceByDom'].on('click', (function (option) {
-    const scopedVariables = this.scopedVariables;
     return function (params) {
       var annotationSeriesName = echartProps.annotationSeriesName;
       if (annotationSeriesName != null) {

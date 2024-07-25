@@ -1,3 +1,4 @@
+/* exported SplunkVisualizationBase */
 const SplunkVisualizationBase = require('api/SplunkVisualizationBase');
 /**
  * To be called from the visualization's click handler, after computing the
@@ -12,7 +13,6 @@ const SplunkVisualizationBase = require('api/SplunkVisualizationBase');
  * this.drilldownToCategory('State', 'Oregon', e);
  */
 
-/* global SplunkVisualizationBase */
 const _drilldownToCategory = function (categoryName, categoryFieldValue, browserEvent) {
   var data = {};
   data[categoryName] = categoryFieldValue;

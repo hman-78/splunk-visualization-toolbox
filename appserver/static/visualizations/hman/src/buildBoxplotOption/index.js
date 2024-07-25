@@ -1,7 +1,5 @@
 const _buildBoxplotOption = function (data, config) {
   var configOption = config[this.getPropertyNamespaceInfo().propertyNamespace + "option"];
-  var configXAxisDataIndexBinding = config[this.getPropertyNamespaceInfo().propertyNamespace + "xAxisDataIndexBinding"];
-  var configSeriesDataIndexBinding = config[this.getPropertyNamespaceInfo().propertyNamespace + "seriesDataIndexBinding"];
 
   var option = {};
   option = this._parseOption(configOption);

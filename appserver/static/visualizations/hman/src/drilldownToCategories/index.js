@@ -1,3 +1,5 @@
+/* exported SplunkVisualizationBase */
+
 const SplunkVisualizationBase = require('api/SplunkVisualizationBase');
 
 /**
@@ -6,7 +8,6 @@ const SplunkVisualizationBase = require('api/SplunkVisualizationBase');
  *
  */
 
-/* global SplunkVisualizationBase */
 const _drilldownToCategories = function (categoryNames, categoryValues, browserEvent) {
   var data = {};
   if (categoryNames != null) {
