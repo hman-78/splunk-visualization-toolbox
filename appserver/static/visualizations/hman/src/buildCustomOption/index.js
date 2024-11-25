@@ -91,7 +91,6 @@ const _buildCustomOption = function (data, config) {
 
   xAxisDataIndex = this._parseIndex(configXAxisDataIndexBinding);
   seriesDataIndex = this._parseIndex(configSeriesDataIndexBinding);
-  //eslint-disable-next-line
   echartProps.seriesColorDataIndexBinding = Number(configSeriesColorDataIndexBinding);
 
   
@@ -111,9 +110,13 @@ const _buildCustomOption = function (data, config) {
   // If there's a wildcard declared, prefill option.series with last series template from maxStaticIdxBinding until the end of the data.fields
   if(tmpSeriesDataIdxBindings.hasWildcard) {
     const tmpSeriesIdxTemplate = tmpSeriesDataIdxBindings.integers.length;
+    if(typeof originalConfigOption.series[tmpSeriesIdxTemplate] === 'undefined') {
+      throw 'You must define a dynamic series template to be used for the wildcard notation!';
+    }
     const tmpSeriesDynamicTemplates = structuredClone(originalConfigOption.series[tmpSeriesIdxTemplate]);
     for(let i = maxStaticIdxBinding + 1; i < data.fields.length; i++) {
       console.log(`Add series with index :${i}... to option`);
+      tmpSeriesDataIdxBindings.integers.push(i);
       const tmpNewSeries = structuredClone(tmpSeriesDynamicTemplates);
       tmpNewSeries.data = [];
       tmpNewSeries.name = data.fields[i].name || `dynamicSeries_${i}`;
@@ -171,36 +174,41 @@ const _buildCustomOption = function (data, config) {
     }
   }
 
+  function computeSeriesDataByIndex(idxForRows, idxForSeriesBinding) {
+    var dataObj = {
+      value: 0
+    };
+    console.log('computeSeriesDataByIndex')
+    if (isNaN(tmpSeriesDataIdxBindings.integers[idxForSeriesBinding])) {
+      // map list of rows to an array
+      var mapping = [];
+      var arrayData = [];
+      mapping = tmpSeriesDataIdxBindings.integers[idxForSeriesBinding];
+      for (let k = 0; k < mapping.length; k++) {
+        arrayData.push(data.rows[idxForRows][mapping[k]]);
+      }
+      dataObj.value = arrayData;
+    } else {
+      // map to a single row
+      dataObj.value = data.rows[idxForRows][tmpSeriesDataIdxBindings.integers[idxForSeriesBinding]];
+    }
+    // check if seriesColorDataIndexBinding is set
+    // if yes map the color of the given row to the item style of the 
+    // given series.data entry
+    if (!isNaN(echartProps.seriesColorDataIndexBinding)) {
+      dataObj['itemStyle'] = {};
+      dataObj.itemStyle.color = data.rows[idxForRows][echartProps.seriesColorDataIndexBinding];
+    }
+    return dataObj;
+  }
 
   for (let i = 0; i < data.rows.length; i++) {
+    // Iterate through static defined series and wildcard dynamic integer series and push data
     for (let j = 0; j < tmpSeriesDataIdxBindings.integers.length; j++) {
-      var dataObj = {
-        value: 0
-      };
-      if (isNaN(tmpSeriesDataIdxBindings.integers[j])) {
-        // map list of rows to an array
-        var mapping = [];
-        var arrayData = [];
-        mapping = tmpSeriesDataIdxBindings.integers[j];
-        for (let k = 0; k < mapping.length; k++) {
-          arrayData.push(data.rows[i][mapping[k]]);
-        }
-        dataObj.value = arrayData;
-      } else {
-        // map to a single row
-        dataObj.value = data.rows[i][tmpSeriesDataIdxBindings.integers[j]];
-      }
-      // check if seriesColorDataIndexBinding is set
-      // if yes map the color of the given row to the item style of the 
-      // given series.data entry
-      //eslint-disable-next-line
-      if (!isNaN(echartProps.seriesColorDataIndexBinding)) {
-        dataObj['itemStyle'] = {};
-        //eslint-disable-next-line
-        dataObj.itemStyle.color = data.rows[i][echartProps.seriesColorDataIndexBinding];
-      }
-      option.series[j].data.push(dataObj);
+      const tmpComputedSeriesData = computeSeriesDataByIndex(i, j);
+      option.series[j].data.push(tmpComputedSeriesData);
     }
+    // Iterate through dynamic tupple computed series and push data
   }
 
   if (configErrorDataIndexBinding != null) {
