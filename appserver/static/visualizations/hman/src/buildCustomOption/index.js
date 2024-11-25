@@ -28,18 +28,61 @@
  *        of the options
  *      
  */
+
+function parseAndAnalyze(inputString) {
+  // Split the input string by commas while respecting square brackets
+  const elements = inputString.split(/,(?![^[]*\])/).map(el => el.trim());
+  
+  // Initialize output categories
+  const integers = [];
+  const tuples = [];
+  let hasWildcard = false;
+
+  // Process each element
+  elements.forEach(element => {
+      if (element === "*") {
+          hasWildcard = true; // Detect wildcard
+      } else if (/^\[.*\]$/.test(element)) {
+          // Detect tuple and parse it
+          const content = element.slice(1, -1); // Remove square brackets
+          const tuple = content.split(';').map(item => item.trim());
+          tuples.push(tuple);
+      } else if (/^-?\d+$/.test(element)) {
+          // Detect integers
+          integers.push(parseInt(element, 10));
+      }
+  });
+
+  return {
+      integers,
+      tuples,
+      hasWildcard
+  };
+}
+
 const _buildCustomOption = function (data, config) {
   var configOption = config[this.getPropertyNamespaceInfo().propertyNamespace + "option"];
   var configXAxisDataIndexBinding = config[this.getPropertyNamespaceInfo().propertyNamespace + "xAxisDataIndexBinding"];
   var configSeriesDataIndexBinding = config[this.getPropertyNamespaceInfo().propertyNamespace + "seriesDataIndexBinding"];
   var configErrorDataIndexBinding = config[this.getPropertyNamespaceInfo().propertyNamespace + "errorDataIndexBinding"];
   var configSeriesColorDataIndexBinding = config[this.getPropertyNamespaceInfo().propertyNamespace + "seriesColorDataIndexBinding"];
-
-  var option = {};
-  option = this._parseOption(configOption);
-  if (option == null) {
+  
+  // Read echart properties
+  const echartProps = this._getEchartProps(config);
+  
+  const originalConfigOption = this._parseOption(configOption);
+  if (originalConfigOption == null) {
     return null;
   }
+  const option = structuredClone(originalConfigOption); //Create deep clone of original config option using structured clone algorithm
+  option.series = []; //Reset option.series array because it will be constructed dynamically based on parseAndAnalyze output
+  
+  const tmpSeriesDataIdxBindings = parseAndAnalyze(configSeriesDataIndexBinding);
+  let maxStaticIdxBinding = 0;
+  console.log(`configSeriesDataIndexBinding: ${configSeriesDataIndexBinding}`)
+  console.log("Integers:", tmpSeriesDataIdxBindings.integers);
+  console.log("Tuples:", tmpSeriesDataIdxBindings.tuples);
+  console.log("Contains Wildcard (*):", tmpSeriesDataIdxBindings.hasWildcard);
 
   // array with list of comma separated values provided in configXAxisDataIndexBinding
   var xAxisDataIndex = [];
@@ -49,16 +92,36 @@ const _buildCustomOption = function (data, config) {
   xAxisDataIndex = this._parseIndex(configXAxisDataIndexBinding);
   seriesDataIndex = this._parseIndex(configSeriesDataIndexBinding);
   //eslint-disable-next-line
-  seriesColorDataIndexBinding = Number(configSeriesColorDataIndexBinding);
+  echartProps.seriesColorDataIndexBinding = Number(configSeriesColorDataIndexBinding);
 
-  for (let i = 0; i < seriesDataIndex.length; i++) {
+  
+  if (tmpSeriesDataIdxBindings.integers.length === 0) {
+      console.log("tmpSeriesDataIdxBindings static index binding array is empty");
+      return null;
+  } else {
+      maxStaticIdxBinding = Math.max(...tmpSeriesDataIdxBindings.integers);
+      console.log(`maxStaticIdxBinding: ${maxStaticIdxBinding}`);
+  }
+  for(let i = 0; i < tmpSeriesDataIdxBindings.integers.length; i++) {
+    option.series[i] = structuredClone(originalConfigOption.series[i]);
     option.series[i].data = [];
-    if (!option.series[i].name) {
-      option.series[i].name = data.fields[seriesDataIndex[i]].name;
-    }
-
+    option.series[i].name = data.fields[i].name || `series_idx_${i}`;
   }
 
+  // If there's a wildcard declared, prefill option.series with last series template from maxStaticIdxBinding until the end of the data.fields
+  if(tmpSeriesDataIdxBindings.hasWildcard) {
+    const tmpSeriesIdxTemplate = tmpSeriesDataIdxBindings.integers.length;
+    const tmpSeriesDynamicTemplates = structuredClone(originalConfigOption.series[tmpSeriesIdxTemplate]);
+    for(let i = maxStaticIdxBinding + 1; i < data.fields.length; i++) {
+      console.log(`Add series with index :${i}... to option`);
+      const tmpNewSeries = structuredClone(tmpSeriesDynamicTemplates);
+      tmpNewSeries.data = [];
+      tmpNewSeries.name = data.fields[i].name || `dynamicSeries_${i}`;
+      option.series.push(tmpNewSeries);
+    }
+  }
+
+  console.log('After first static manipulation...');
   // xAxis can be configured as option.xAxis instance or as option.xAxis[] array
   // we map the xAxis option to the array xAxisObjects to make it easier for 
   // the mapping logic 
@@ -110,32 +173,31 @@ const _buildCustomOption = function (data, config) {
 
 
   for (let i = 0; i < data.rows.length; i++) {
-    for (let j = 0; j < seriesDataIndex.length; j++) {
+    for (let j = 0; j < tmpSeriesDataIdxBindings.integers.length; j++) {
       var dataObj = {
-        value: 0,
-
+        value: 0
       };
-      if (isNaN(seriesDataIndex[j])) {
+      if (isNaN(tmpSeriesDataIdxBindings.integers[j])) {
         // map list of rows to an array
         var mapping = [];
         var arrayData = [];
-        mapping = seriesDataIndex[j];
+        mapping = tmpSeriesDataIdxBindings.integers[j];
         for (let k = 0; k < mapping.length; k++) {
           arrayData.push(data.rows[i][mapping[k]]);
         }
         dataObj.value = arrayData;
       } else {
         // map to a single row
-        dataObj.value = data.rows[i][seriesDataIndex[j]];
+        dataObj.value = data.rows[i][tmpSeriesDataIdxBindings.integers[j]];
       }
       // check if seriesColorDataIndexBinding is set
       // if yes map the color of the given row to the item style of the 
       // given series.data entry
       //eslint-disable-next-line
-      if (!isNaN(seriesColorDataIndexBinding)) {
+      if (!isNaN(echartProps.seriesColorDataIndexBinding)) {
         dataObj['itemStyle'] = {};
         //eslint-disable-next-line
-        dataObj.itemStyle.color = data.rows[i][seriesColorDataIndexBinding];
+        dataObj.itemStyle.color = data.rows[i][echartProps.seriesColorDataIndexBinding];
       }
       option.series[j].data.push(dataObj);
     }
@@ -143,7 +205,6 @@ const _buildCustomOption = function (data, config) {
 
   if (configErrorDataIndexBinding != null) {
     // adding an error bar chart to the list of series 
-
     // parsing the rows indices of the error data
     var errorDataIndexSplit = configErrorDataIndexBinding.split(",");
     if (errorDataIndexSplit.length != 2) {
@@ -247,7 +308,7 @@ const _buildCustomOption = function (data, config) {
     // adding value of yAxisIndex to errorSeries
     option.series[option.series.length - 1]["yAxisIndex"] = option.yAxis.length - 1;
   }
-
+  console.log('Before exiting...');
   return option;
 }
 
