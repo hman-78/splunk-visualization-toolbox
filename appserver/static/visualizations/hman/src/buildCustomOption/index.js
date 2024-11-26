@@ -107,6 +107,37 @@ const _buildCustomOption = function (data, config) {
     option.series[i].name = data.fields[i].name || `series_idx_${i}`;
   }
 
+  // if there are tupples declared, prefill option.series with last series template from tupples index bindings until the end of the tupples
+  if(tmpSeriesDataIdxBindings.tuples.length > 0) {
+    const tmpSeriesIdxTemplate = tmpSeriesDataIdxBindings.integers.length;
+    if(typeof originalConfigOption.series[tmpSeriesIdxTemplate] === 'undefined') {
+      throw 'You must define a dynamic series template to be used for the tupple notation!';
+    }
+    const tmpSeriesDynamicTemplates = structuredClone(originalConfigOption.series[tmpSeriesIdxTemplate]);
+    // For each tupple add items to option.series array
+    console.log('For each tupple add items to option.series array');
+    for(let i = 0; i < tmpSeriesDataIdxBindings.tuples.length; i++) {
+      const convertedTupleToArray = tmpSeriesDataIdxBindings.tuples[i][0].split(',');
+      let tuppleStartIdx = convertedTupleToArray[0];
+      let tuppleEndIdx = convertedTupleToArray[1];
+      if(tuppleStartIdx.includes('*') && tuppleEndIdx.includes('*')) {
+        throw `The tupple definition is wrong! Tupples cannot contain * character in both start and end indexes.`
+      }
+      let tmpStartIteratorIdx = 0;
+      let tmpEndIteratorIdx = 0;
+      if(tuppleStartIdx.includes('*')) {
+        console.log('We have a tupple with a wildcard at start...');
+        tmpStartIteratorIdx = parseInt(tuppleStartIdx.replace('*', ''));
+      }
+      if(tuppleEndIdx.includes('*')) {
+        console.log('We have a tupple with a wildcard at end...');
+        tmpEndIteratorIdx = parseInt(tuppleEndIdx.replace('*', ''));
+      }
+      console.log('tmpStartIteratorIdx', tmpStartIteratorIdx);
+      console.log('tuppleEndIdx', tmpEndIteratorIdx);
+    }
+  }
+
   // If there's a wildcard declared, prefill option.series with last series template from maxStaticIdxBinding until the end of the data.fields
   if(tmpSeriesDataIdxBindings.hasWildcard) {
     const tmpSeriesIdxTemplate = tmpSeriesDataIdxBindings.integers.length;
